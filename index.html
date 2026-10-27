@@ -407,7 +407,7 @@
             <tr><th>A</th><th>B</th><th>C</th><th>Y</th></tr>
           </thead>
           <tbody id="q3_tt_body">
-            <tr><td colspan="4" style="color: var(--text-muted);">Enter name above to generate quiz</td></tr>
+            <tr><td colspan="4" style="color: var(--text-muted);">Please enter your name above</td></tr>
           </tbody>
         </table>
       </div>
@@ -422,7 +422,7 @@
         4. Simplify this equation:
       </div>
       
-      <div class="eq-display" id="q4_equation">Enter name above to generate quiz</div>
+      <div class="eq-display" id="q4_equation">Please enter your name above</div>
 
       <div class="sub-prompt">Simplified Equation / Steps (Tap below to edit):</div>
       <div class="custom-input-box" id="q4_box" style="min-height: 80px;" onclick="handleBoxClick('q4', event)"></div>
@@ -447,3 +447,283 @@
       <button class="key-btn" onmousedown="handleKeyInput(' ) ', event)">)</button>
       <button class="key-btn" onmousedown="handleKeyInput(' · ', event)">·</button>
       <button class="key-btn action-key" onmousedown="handleClear(event)">CLR</button>
+      <button class="key-btn newline-key" onmousedown="handleNewline(event)">↵ New Line</button>
+    </div>
+  </div>
+
+  <!-- Modal Output for Review -->
+  <div class="modal-overlay" id="review_modal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeModal()">Close</button>
+      <h2>Submitted Answers</h2>
+      <div id="modal_answers_body"></div>
+    </div>
+  </div>
+
+  <script>
+    let activeBoxId = 'q3';
+    let boxStates = {
+      q3: { text: "Y = ", caretIndex: 4 },
+      q4: { text: "Y = ", caretIndex: 4 }
+    };
+
+    let currentQuizData = null;
+
+    const Q4_EQUATION_POOL = [
+      "Y = (A · B · C) + (A · B · C̄) + (A · B̄ · C) + (Ā · B · C)",
+      "Y = (A · B · C) + (A · B · C̄) + (A · B̄ · C̄) + (Ā · B̄ · C̄)",
+      "Y = (Ā · B̄ · C) + (Ā · B · C) + (A · B · C̄) + (A · B · C)",
+      "Y = (A · B̄ · C) + (A · B̄ · C̄) + (Ā · B · C) + (A · B · C)",
+      "Y = (Ā · B · C̄) + (Ā · B · C) + (A · B̄ · C) + (A · B · C)",
+      "Y = (Ā · B̄ · C̄) + (Ā · B · C̄) + (A · B̄ · C̄) + (A · B · C)",
+      "Y = (A · B̄ · C) + (A · B · C) + (Ā · B · C̄) + (A · B · C̄)",
+      "Y = (Ā · B̄ · C̄) + (Ā · B · C) + (A · B̄ · C̄) + (A · B · C)",
+      "Y = (A · B · C̄) + (A · B̄ · C) + (Ā · B · C) + (A · B · C)",
+      "Y = (Ā · B̄ · C) + (Ā · B · C̄) + (A · B̄ · C) + (A · B · C̄)"
+    ];
+
+    function stringHash(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = (hash << 5) - hash + str.charCodeAt(i);
+        hash |= 0;
+      }
+      return Math.abs(hash);
+    }
+
+    function createPRNG(seed) {
+      let s = seed;
+      return function() {
+        s = (s * 9301 + 49297) % 233280;
+        return s / 233280;
+      };
+    }
+
+    function generateQuizFromName() {
+      const name = document.getElementById("student_name").value.trim().toLowerCase();
+      const ttBody = document.getElementById("q3_tt_body");
+
+      if (!name) {
+        currentQuizData = null;
+        document.getElementById("q1_bytes_text").innerText = "---";
+        ttBody.innerHTML = '<tr><td colspan="4" style="color: var(--text-muted);">Please enter your name above</td></tr>';
+        document.getElementById("q4_equation").innerText = "Please enter your name above";
+        return;
+      }
+
+      const seed = stringHash(name);
+      const rng = createPRNG(seed);
+
+      const N = Math.floor(rng() * 7) + 8;
+      const totalBytes = Math.pow(2, N);
+      const maxDec = totalBytes - 1;
+      const maxBin = "1".repeat(N);
+      const maxHex = maxDec.toString(16).toUpperCase();
+
+      document.getElementById("q1_bytes_text").innerText = totalBytes.toLocaleString();
+
+      const ttRows = [];
+      const minterms = [];
+      for (let i = 0; i < 8; i++) {
+        const a = (i >> 2) & 1;
+        const b = (i >> 1) & 1;
+        const c = i & 1;
+        const y = rng() > 0.45 ? 1 : 0;
+        ttRows.push({ a, b, c, y });
+        if (y === 1) {
+          const aStr = a ? 'A' : 'A′';
+          const bStr = b ? 'B' : 'B′';
+          const cStr = c ? 'C' : 'C′';
+          minterms.push(`${aStr}${bStr}${cStr}`);
+        }
+      }
+
+      ttBody.innerHTML = "";
+      ttRows.forEach(row => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${row.a}</td><td>${row.b}</td><td>${row.c}</td><td><strong>${row.y}</strong></td>`;
+        ttBody.appendChild(tr);
+      });
+
+      const q4Eq = Q4_EQUATION_POOL[Math.floor(rng() * Q4_EQUATION_POOL.length)];
+      document.getElementById("q4_equation").innerText = q4Eq;
+
+      currentQuizData = {
+        N,
+        maxDec,
+        maxBin,
+        maxHex,
+        expectedQ3Minterms: "Y = " + (minterms.join(" + ") || "0"),
+        q4Eq
+      };
+    }
+
+    function renderCustomBox(boxId) {
+      const box = document.getElementById(boxId + '_box');
+      const state = boxStates[boxId];
+      const text = state.text;
+      const idx = state.caretIndex;
+
+      box.classList.toggle('focused', activeBoxId === boxId);
+
+      if (activeBoxId === boxId) {
+        const before = text.slice(0, idx);
+        const after = text.slice(idx);
+        box.innerHTML = escapeHtml(before) + '<span class="custom-caret"></span>' + escapeHtml(after);
+      } else {
+        box.innerText = text;
+      }
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function handleBoxClick(boxId, evt) {
+      activeBoxId = boxId;
+      document.getElementById('keypad_target_text').innerText = 'Editing: Question ' + (boxId === 'q3' ? '3' : '4');
+
+      const box = document.getElementById(boxId + '_box');
+      let offset = boxStates[boxId].text.length;
+
+      if (document.caretRangeFromPoint) {
+        const range = document.caretRangeFromPoint(evt.clientX, evt.clientY);
+        if (range && box.contains(range.startContainer)) {
+          offset = calculateCharOffset(box, range.startContainer, range.startOffset);
+        }
+      } else if (document.caretPositionFromPoint) {
+        const pos = document.caretPositionFromPoint(evt.clientX, evt.clientY);
+        if (pos && box.contains(pos.offsetNode)) {
+          offset = calculateCharOffset(box, pos.offsetNode, pos.offset);
+        }
+      }
+
+      boxStates[boxId].caretIndex = Math.min(Math.max(0, offset), boxStates[boxId].text.length);
+      renderCustomBox('q3');
+      renderCustomBox('q4');
+    }
+
+    function calculateCharOffset(container, targetNode, targetOffset) {
+      let charCount = 0;
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+      let node;
+      while ((node = walker.nextNode())) {
+        if (node === targetNode) {
+          return charCount + targetOffset;
+        }
+        charCount += node.nodeValue.length;
+      }
+      return charCount;
+    }
+
+    function handleKeyInput(char, evt) {
+      if (evt) evt.preventDefault();
+      const state = boxStates[activeBoxId];
+      const before = state.text.slice(0, state.caretIndex);
+      const after = state.text.slice(state.caretIndex);
+      
+      state.text = before + char + after;
+      state.caretIndex += char.length;
+      renderCustomBox(activeBoxId);
+    }
+
+    function handleBackspace(evt) {
+      if (evt) evt.preventDefault();
+      const state = boxStates[activeBoxId];
+      if (state.caretIndex > 0) {
+        const before = state.text.slice(0, state.caretIndex - 1);
+        const after = state.text.slice(state.caretIndex);
+        state.text = before + after;
+        state.caretIndex -= 1;
+        renderCustomBox(activeBoxId);
+      }
+    }
+
+    function handleClear(evt) {
+      if (evt) evt.preventDefault();
+      boxStates[activeBoxId] = { text: "Y = ", caretIndex: 4 };
+      renderCustomBox(activeBoxId);
+    }
+
+    function handleNewline(evt) {
+      if (evt) evt.preventDefault();
+      if (activeBoxId === 'q3') {
+        activeBoxId = 'q4';
+        document.getElementById('keypad_target_text').innerText = 'Editing: Question 4';
+        renderCustomBox('q3');
+        renderCustomBox('q4');
+      } else {
+        handleKeyInput('\nY = ', null);
+      }
+    }
+
+    function submitQuiz() {
+      const studentName = document.getElementById('student_name').value.trim();
+
+      if (!studentName || !currentQuizData) {
+        alert("Please enter your full name to generate the quiz before submitting!");
+        return;
+      }
+
+      const payload = {
+        studentInfo: {
+          name: studentName
+        },
+        studentAnswers: {
+          q1_N: document.getElementById('q1_ans').value,
+          q2_dec: document.getElementById('q2_dec').value,
+          q2_bin: document.getElementById('q2_bin').value,
+          q2_hex: document.getElementById('q2_hex').value,
+          q3_minterm: boxStates.q3.text,
+          q4_simplification: boxStates.q4.text
+        },
+        generatedQuizKey: currentQuizData
+      };
+
+      const modal = document.getElementById('review_modal');
+      const body = document.getElementById('modal_answers_body');
+
+      body.innerHTML = `
+        <div class="ans-row">
+          <div class="ans-label">Student:</div>
+          <div>${payload.studentInfo.name}</div>
+        </div>
+        <div class="ans-row">
+          <div class="ans-label">Q1 Bit Width N:</div>
+          <div>Student: <code>${payload.studentAnswers.q1_N || '(empty)'}</code></div>
+          <div>Expected: <code>${currentQuizData.N}</code></div>
+        </div>
+        <div class="ans-row">
+          <div class="ans-label">Q2 Addresses (Dec / Bin / Hex):</div>
+          <div>Student: <code>${payload.studentAnswers.q2_dec || '-'}</code> | <code>0b${payload.studentAnswers.q2_bin || '-'}</code> | <code>0x${payload.studentAnswers.q2_hex || '-'}</code></div>
+          <div>Expected: <code>${currentQuizData.maxDec}</code> | <code>0b${currentQuizData.maxBin}</code> | <code>0x${currentQuizData.maxHex}</code></div>
+        </div>
+        <div class="ans-row">
+          <div class="ans-label">Q3 Minterm Equation:</div>
+          <pre style="margin: 4px 0;">${payload.studentAnswers.q3_minterm}</pre>
+        </div>
+        <div class="ans-row">
+          <div class="ans-label">Q4 Boolean Simplification:</div>
+          <pre style="margin: 4px 0;">${payload.studentAnswers.q4_simplification}</pre>
+        </div>
+      `;
+
+      modal.style.display = 'flex';
+
+      if (typeof window.saveQuizToFirebase === 'function') {
+        window.saveQuizToFirebase(payload);
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('review_modal').style.display = 'none';
+    }
+
+    window.onload = function() {
+      generateQuizFromName();
+      renderCustomBox('q3');
+      renderCustomBox('q4');
+    };
+  </script>
+</body>
+</html>
