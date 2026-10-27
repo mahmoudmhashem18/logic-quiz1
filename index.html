@@ -335,26 +335,27 @@
     }
   </style>
 
-  <!-- Firebase SDKs (Web v9 Modular via CDN) -->
+  
+  <!-- Firebase SDKs (Web v10 Modular via CDN) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-    // 1. REPLACE THIS WITH YOUR FIREBASE CONFIG
+  
+    // Your web app's Firebase configuration
     const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
+      apiKey: "AIzaSyAio7J2hr_khoe1xO3ECioRr-_xszsaRL0",
+      authDomain: "logic-quiz1.firebaseapp.com",
+      projectId: "logic-quiz1",
+      storageBucket: "logic-quiz1.firebasestorage.app",
+      messagingSenderId: "260177229973",
+      appId: "1:260177229973:web:d20b4e43f490628b2c439c"
     };
-
-    // Initialize Firebase
+  
+    // Initialize Firebase & Firestore
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-
-    // Make save function accessible globally
+  
+    // Global save function used when students submit the quiz
     window.saveQuizToFirebase = async function(submissionData) {
       try {
         const docRef = await addDoc(collection(db, "quiz_submissions"), {
@@ -362,10 +363,10 @@
           submittedAt: serverTimestamp()
         });
         console.log("Submission saved with ID: ", docRef.id);
-        alert("Quiz submitted successfully!");
+        alert("✅ Quiz submitted successfully!");
       } catch (e) {
         console.error("Error adding document: ", e);
-        alert("Error saving submission. Check browser console.");
+        alert("❌ Error saving submission. Make sure Firestore is created in Test Mode.");
       }
     };
   </script>
