@@ -42,30 +42,12 @@
       position: sticky;
       top: 0;
       z-index: 10;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
     }
 
     header h1 {
       margin: 0;
       font-size: 1.1rem;
       font-weight: 600;
-    }
-
-    .btn-gen {
-      background: #3b82f6;
-      color: white;
-      border: none;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .btn-gen:active {
-      background: #1d4ed8;
     }
 
     .quiz-container {
@@ -335,13 +317,11 @@
     }
   </style>
 
-  
   <!-- Firebase SDKs (Web v10 Modular via CDN) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
   
-    // Your web app's Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyAio7J2hr_khoe1xO3ECioRr-_xszsaRL0",
       authDomain: "logic-quiz1.firebaseapp.com",
@@ -351,11 +331,9 @@
       appId: "1:260177229973:web:d20b4e43f490628b2c439c"
     };
   
-    // Initialize Firebase & Firestore
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
   
-    // Global save function used when students submit the quiz
     window.saveQuizToFirebase = async function(submissionData) {
       try {
         const docRef = await addDoc(collection(db, "quiz_submissions"), {
@@ -375,7 +353,6 @@
 
   <header>
     <h1>Digital Logic Quiz</h1>
-    <button class="btn-gen" onclick="generateNewQuiz()">🎲 New Quiz</button>
   </header>
 
   <div class="quiz-container">
@@ -384,18 +361,15 @@
     <div class="question-card" style="border-left: 4px solid var(--primary);">
       <div class="question-title">📋 Student Information</div>
       <div class="sub-prompt">Full Name:</div>
-      <input type="text" id="student_name" placeholder="Enter your full name">
-      
-      <div class="sub-prompt" style="margin-top: 10px;">Student ID / Section:</div>
-      <input type="text" id="student_id" placeholder="Enter your ID or group">
+      <input type="text" id="student_name" placeholder="Enter your full name" oninput="generateQuizFromName()">
     </div>
 
     <!-- Question 1 -->
     <div class="question-card">
       <div class="question-title">
-        1. A digital system memory has <span id="q1_N_text">12</span> address lines and can reference up to <span id="q1_bytes_text">4,096</span> unique memory bytes.
+        1. A digital system memory can reference up to <span id="q1_bytes_text">4,096</span> unique memory bytes.
       </div>
-      <div class="sub-prompt">What is the minimum required bit width N?</div>
+      <div class="sub-prompt">What is the minimum required bit width N (number of address lines)?</div>
       <input type="number" id="q1_ans" placeholder="Enter bit width N" inputmode="numeric">
     </div>
 
@@ -437,7 +411,7 @@
       </div>
 
       <div class="sub-prompt">Minterm Equation (Tap below to edit):</div>
-      <div class="custom-input-box" id="q3_box" onclick="focusCustomBox('q3')"></div>
+      <div class="custom-input-box" id="q3_box" onclick="handleBoxClick('q3', event)"></div>
     </div>
 
     <!-- Question 4 -->
@@ -449,7 +423,7 @@
       <div class="eq-display" id="q4_equation">Y = (A · B · C) + (A · B · C̄) + (A · B̄ · C) + (Ā · B · C)</div>
 
       <div class="sub-prompt">Simplified Equation / Steps (Tap below to edit):</div>
-      <div class="custom-input-box" id="q4_box" style="min-height: 80px;" onclick="focusCustomBox('q4')"></div>
+      <div class="custom-input-box" id="q4_box" style="min-height: 80px;" onclick="handleBoxClick('q4', event)"></div>
     </div>
 
     <button class="submit-btn" onclick="submitQuiz()">Submit Quiz</button>
@@ -506,14 +480,35 @@
       "Y = (Ā · B̄ · C) + (Ā · B · C̄) + (A · B̄ · C) + (A · B · C̄)"
     ];
 
-    function generateNewQuiz() {
-      const N = Math.floor(Math.random() * 7) + 8;
+    // Seeded PRNG for reproducible random quiz values per student name
+    function stringHash(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = (hash << 5) - hash + str.charCodeAt(i);
+        hash |= 0;
+      }
+      return hash;
+    }
+
+    function createPRNG(seed) {
+      let s = seed;
+      return function() {
+        s = (s * 9301 + 49297) % 233280;
+        return s / 233280;
+      };
+    }
+
+    function generateQuizFromName() {
+      const name = document.getElementById("student_name").value.trim().toLowerCase();
+      const seed = name ? stringHash(name) : 12345;
+      const rng = createPRNG(seed);
+
+      const N = Math.floor(rng() * 7) + 8;
       const totalBytes = Math.pow(2, N);
       const maxDec = totalBytes - 1;
       const maxBin = "1".repeat(N);
       const maxHex = maxDec.toString(16).toUpperCase();
 
-      document.getElementById("q1_N_text").innerText = N;
       document.getElementById("q1_bytes_text").innerText = totalBytes.toLocaleString();
 
       const ttRows = [];
@@ -522,7 +517,7 @@
         const a = (i >> 2) & 1;
         const b = (i >> 1) & 1;
         const c = i & 1;
-        const y = Math.random() > 0.45 ? 1 : 0;
+        const y = rng() > 0.45 ? 1 : 0;
         ttRows.push({ a, b, c, y });
         if (y === 1) {
           const aStr = a ? 'A' : 'A′';
@@ -540,19 +535,8 @@
         ttBody.appendChild(tr);
       });
 
-      const q4Eq = Q4_EQUATION_POOL[Math.floor(Math.random() * Q4_EQUATION_POOL.length)];
+      const q4Eq = Q4_EQUATION_POOL[Math.floor(rng() * Q4_EQUATION_POOL.length)];
       document.getElementById("q4_equation").innerText = q4Eq;
-
-      document.getElementById("q1_ans").value = "";
-      document.getElementById("q2_dec").value = "";
-      document.getElementById("q2_bin").value = "";
-      document.getElementById("q2_hex").value = "";
-
-      boxStates.q3 = { text: "Y = ", caretIndex: 4 };
-      boxStates.q4 = { text: "Y = ", caretIndex: 4 };
-
-      renderCustomBox('q3');
-      renderCustomBox('q4');
 
       currentQuizData = {
         N,
@@ -585,11 +569,41 @@
       return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
-    function focusCustomBox(boxId) {
+    function handleBoxClick(boxId, evt) {
       activeBoxId = boxId;
       document.getElementById('keypad_target_text').innerText = 'Editing: Question ' + (boxId === 'q3' ? '3' : '4');
+
+      const box = document.getElementById(boxId + '_box');
+      let offset = boxStates[boxId].text.length;
+
+      if (document.caretRangeFromPoint) {
+        const range = document.caretRangeFromPoint(evt.clientX, evt.clientY);
+        if (range && box.contains(range.startContainer)) {
+          offset = calculateCharOffset(box, range.startContainer, range.startOffset);
+        }
+      } else if (document.caretPositionFromPoint) {
+        const pos = document.caretPositionFromPoint(evt.clientX, evt.clientY);
+        if (pos && box.contains(pos.offsetNode)) {
+          offset = calculateCharOffset(box, pos.offsetNode, pos.offset);
+        }
+      }
+
+      boxStates[boxId].caretIndex = Math.min(Math.max(0, offset), boxStates[boxId].text.length);
       renderCustomBox('q3');
       renderCustomBox('q4');
+    }
+
+    function calculateCharOffset(container, targetNode, targetOffset) {
+      let charCount = 0;
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+      let node;
+      while ((node = walker.nextNode())) {
+        if (node === targetNode) {
+          return charCount + targetOffset;
+        }
+        charCount += node.nodeValue.length;
+      }
+      return charCount;
     }
 
     function handleKeyInput(char, evt) {
@@ -624,7 +638,10 @@
     function handleNewline(evt) {
       if (evt) evt.preventDefault();
       if (activeBoxId === 'q3') {
-        focusCustomBox('q4');
+        activeBoxId = 'q4';
+        document.getElementById('keypad_target_text').innerText = 'Editing: Question 4';
+        renderCustomBox('q3');
+        renderCustomBox('q4');
       } else {
         handleKeyInput('\nY = ', null);
       }
@@ -632,7 +649,6 @@
 
     function submitQuiz() {
       const studentName = document.getElementById('student_name').value.trim();
-      const studentId = document.getElementById('student_id').value.trim();
 
       if (!studentName) {
         alert("Please enter your full name before submitting!");
@@ -641,8 +657,7 @@
 
       const payload = {
         studentInfo: {
-          name: studentName,
-          id: studentId
+          name: studentName
         },
         studentAnswers: {
           q1_N: document.getElementById('q1_ans').value,
@@ -655,14 +670,13 @@
         generatedQuizKey: currentQuizData
       };
 
-      // Show local review modal
       const modal = document.getElementById('review_modal');
       const body = document.getElementById('modal_answers_body');
 
       body.innerHTML = `
         <div class="ans-row">
           <div class="ans-label">Student:</div>
-          <div>${payload.studentInfo.name} (${payload.studentInfo.id || 'N/A'})</div>
+          <div>${payload.studentInfo.name}</div>
         </div>
         <div class="ans-row">
           <div class="ans-label">Q1 Bit Width N:</div>
@@ -686,7 +700,6 @@
 
       modal.style.display = 'flex';
 
-      // Save to Firebase (if configured)
       if (typeof window.saveQuizToFirebase === 'function') {
         window.saveQuizToFirebase(payload);
       }
@@ -697,7 +710,9 @@
     }
 
     window.onload = function() {
-      generateNewQuiz();
+      generateQuizFromName();
+      renderCustomBox('q3');
+      renderCustomBox('q4');
     };
   </script>
 </body>
